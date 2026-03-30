@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xyzrender Web App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.4/3Dmol-min.js"></script>
+    <style>
+        :root {
+            --bg-color: #fdfbf7;
+            --text-color: #4a4a4a;
+            --primary: #ff8fab;
+            --primary-hover: #fb6f92;
+            --secondary: #a2d2ff;
+            --secondary-hover: #bde0fe;
+            --card-bg: #ffffff;
+            --border-color: #ffe5ec;
+            --shadow: 0 8px 20px rgba(255, 143, 171, 0.15);
+            --radius: 16px;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #2b2d42;
+            --text-color: #edf2f4;
+            --primary: #ffb5a7;
+            --primary-hover: #fcd5ce;
+            --secondary: #8e9aaf;
+            --secondary-hover: #cbc0d3;
+            --card-bg: #3a3c55;
+            --border-color: #4a4e69;
+            --shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            transition: background-color 0.3s, color 0.3s;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        h1, h2, h3 { font-family: 'Nunito', sans-serif; font-weight: 800; color: var(--primary); margin-bottom: 15px; }
+        
+        .header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            padding: 0 20px 20px 20px;
+            overflow: hidden;
+            max-width: 100%;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .left-panel { width: 260px; flex-shrink: 0; }
+        .middle-panel { flex: 1.2; display: flex; flex-direction: column; }
+        .right-panel { flex: 1; display: flex; flex-direction: column; }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 15px;
+            box-shadow: var(--shadow);
+            border: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(255, 143, 171, 0.3);
+            font-size: 0.9em;
+        }
+        .btn:hover { background: var(--primary-hover); transform: scale(1.05); }
+        .btn-secondary { background: var(--secondary); box-shadow: 0 4px 10px rgba(162, 210, 255, 0.3); }
+        .btn-secondary:hover { background: var(--secondary-hover); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .upload-area {
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            background: rgba(255, 143, 171, 0.05);
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            background: rgba(255, 143, 171, 0.15);
+            border-color: var(--primary-hover);
+        }
+        
+        .file-list {
+            list-style: none;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 5px;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(162, 210, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.9em;
+        }
+        .file-item:hover { background: rgba(162, 210, 255, 0.2); }
+        .file-item.selected {
+            background: rgba(255, 143, 171, 0.1);
+            border-color: var(--primary);
+            font-weight: bold;
+        }
+        .delete-btn {
+            color: #ef233c;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 0 5px;
+        }
+
+        /* Style Grid */
+        .style-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 8px;
+            overflow-y: auto;
+        }
+        .style-btn {
+            padding: 8px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        .style-btn:hover, .style-btn.active {
+            border-color: var(--primary);
+            background: rgba(255, 143, 171, 0.1);
+            color: var(--primary);
+        }
+
+        /* Cache Grid */
+        .cache-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+            overflow-y: auto;
+        }
+        .cache-item {
+            position: relative;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            background: var(--bg-color);
+            transition: border-color 0.2s;
+        }
+        .cache-item img {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            display: block;
+        }
+        .cache-item:hover {
+            border-color: var(--primary);
+        }
+        .cache-item .delete-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            padding: 0;
+            color: #ef233c;
+            border: none;
+            cursor: pointer;
+        }
+        [data-theme="dark"] .cache-item .delete-btn {
+            background: rgba(58, 60, 85, 0.8);
+        }
+
+        .preview-area {
+            flex: 1;
+            background: rgba(0,0,0,0.02);
+            border-radius: var(--radius);
+            border: 2px dashed var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 200px;
+        }
+        .preview-area img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .control-group label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Quicksand', sans-serif;
+            font-size: 0.9em;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--primary); }
+
+        .loading {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        [data-theme="dark"] .loading { background: rgba(58,60,85,0.8); }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1000;
+            font-weight: bold;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.error { background: #ef233c; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1 style="margin:0;">✨ xyzrender Web App</h1>
+        <button class="btn btn-secondary" onclick="toggleTheme()">🌓 切换主题</button>
+    </div>
+
+    <div class="container">
+        <!-- Left Panel: Files -->
+        <div class="panel left-panel">
+            <div class="card" style="flex: 1;">
+                <h2>📁 分子文件</h2>
+                <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                    <p>点击/拖拽上传</p>
+                    <p style="font-size: 0.75em; opacity: 0.7;">支持 xyz, xsd, POSCAR, CONTCAR 等</p>
+                    <input type="file" id="file-input" style="display: none;" multiple>
+                </div>
+                <ul class="file-list" id="mol-list"></ul>
+            </div>
+            <div class="card" style="flex: 1; margin-top: 15px;">
+                <h2>⭐ 已保存渲染</h2>
+                <div class="cache-grid" id="saved-list"></div>
+            </div>
+        </div>
+
+        <!-- Middle Panel: 3D Viewer & Styles -->
+        <div class="panel middle-panel">
+            <div class="card" style="flex: 1;">
+                <h2>👁️ 3D 交互预览 (实时同步)</h2>
+                <div id="viewer" style="flex: 1; width: 100%; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border-color); cursor: grab; position: relative;">
+                    <div id="viewer-toolbar" style="position: absolute; top: 10px; right: 10px; display: none; gap: 5px; z-index: 10;">
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; min-width: auto;" onclick="setViewAxis('x')" title="沿X轴查看">X轴</button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; min-width: auto;" onclick="setViewAxis('y')" title="沿Y轴查看">Y轴</button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; min-width: auto;" onclick="setViewAxis('z')" title="沿Z轴查看">Z轴</button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; min-width: auto;" onclick="if(viewer){viewer.zoomTo(); triggerRender();}" title="居中并放大到合适大小">居中放大</button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; min-width: auto;" onclick="saveRotatedMolecule()" title="保存当前视角的分子坐标">💾 保存视角</button>
+                    </div>
+                </div>
+                <p style="font-size: 0.8em; color: var(--secondary); text-align: center; margin-top: 5px;">* 拖拽旋转模型，松开鼠标自动渲染</p>
+            </div>
+            <div class="card" style="flex-shrink: 0;">
+                <h2>🎨 渲染风格 (点击即渲染)</h2>
+                <div class="style-grid">
+                    {% for s in styles %}
+                    <button class="style-btn {% if loop.first %}active{% endif %}" data-style="{{ s }}">{{ style_desc.get(s, s) }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Render Result & Settings -->
+        <div class="panel right-panel">
+            <div class="card" style="flex: 1;">
+                <h2>🖼️ 渲染结果</h2>
+                <div class="preview-area" id="preview-area">
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p style="margin-top: 10px; font-weight: bold; color: var(--primary);">渲染中...</p>
+                    </div>
+                    <img id="preview-img" src="" style="display: none;" alt="Rendered Molecule">
+                    <p id="preview-placeholder" style="color: var(--secondary); font-weight: 600;">选择文件并选择风格</p>
+                </div>
+                <div style="margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn btn-secondary" id="save-btn" disabled onclick="saveImage()">⭐ 保存</button>
+                    <button class="btn btn-secondary" id="download-btn" disabled onclick="downloadImage()">💾 下载图片</button>
+                </div>
+            </div>
+            <div class="card" style="flex-shrink: 0;">
+                <h2>⚙️ 附加设置</h2>
+                <div class="controls-grid">
+                    <div class="control-group">
+                        <label>格式 (Format)</label>
+                        <select id="format" class="auto-render-input">
+                            <option value="png">PNG</option>
+                            <option value="svg">SVG</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>背景色 (Bg Color)</label>
+                        <input type="text" id="bg_color" placeholder="e.g. white, #fff" class="auto-render-input">
+                    </div>
+                    <div class="control-group">
+                        <label>键颜色 (Bond Color)</label>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="color" id="bond_color" value="#808080" class="auto-render-input" data-active="false" oninput="this.dataset.active='true'; this.style.opacity=1;" style="flex: 1; padding: 0; height: 36px; opacity: 0.5; transition: opacity 0.2s;">
+                            <button class="btn btn-secondary" style="padding: 0 10px;" onclick="const el=document.getElementById('bond_color'); el.dataset.active='false'; el.style.opacity=0.5; triggerRender();" title="恢复默认">重置</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>键粗细 (Bond Width)</label>
+                        <input type="number" id="bond_width" step="0.1" placeholder="默认" class="auto-render-input">
+                    </div>
+                    <div class="control-group">
+                        <label>球颜色 (Atom Colors)</label>
+                        <div id="element_colors_container" style="display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; padding-right: 5px;">
+                            <span style="color: #888; font-size: 0.9em;">请先加载分子</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>球大小 (Atom Scale)</label>
+                        <input type="number" id="atom_scale" step="0.1" placeholder="默认" class="auto-render-input">
+                    </div>
+                    <div class="control-group">
+                        <label>边框粗细 (Stroke Width)</label>
+                        <input type="number" id="atom_stroke_width" step="0.1" placeholder="平面球有效" class="auto-render-input">
+                    </div>
+                    <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="transparent" style="width:auto;" class="auto-render-input">
+                        <label style="margin:0;">透明背景</label>
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="flex-shrink: 0; margin-top: 15px;">
+                <details>
+                    <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; margin-bottom: 10px; outline: none;">⚙️ 高级设置</summary>
+                    <div class="controls-grid" style="margin-top: 10px;">
+                        <div class="control-group">
+                            <label>画布大小 (Canvas Size)</label>
+                            <input type="text" id="canvas_size" placeholder="e.g. 800x600" class="auto-render-input">
+                        </div>
+                        <div class="control-group">
+                            <label>DPI (分辨率)</label>
+                            <input type="number" id="dpi" placeholder="e.g. 300" class="auto-render-input">
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="no_bonds" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">隐藏键 (No Bonds)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="no_hy" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">隐藏氢原子 (No Hydrogens)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="hydrogens" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">显示氢键 (H-Bonds)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="idx" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">显示原子序号 (Show Indices)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="cell" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">显示晶胞 (Show Cell)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="axes" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">显示坐标轴 (Show Axes)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="vdw" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">范德华表面 (VDW Surface)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="dof" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">景深效果 (Depth of Field)</label>
+                        </div>
+                        <div class="control-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="fog" style="width:auto;" class="auto-render-input">
+                            <label style="margin:0;">雾化效果 (Fog)</label>
+                        </div>
+                    </div>
+                </details>
+            </div>
+            <div class="card" style="flex: 1; margin-top: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin:0;">🕒 预览缓存</h2>
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="clearTemp()">清空</button>
+                </div>
+                <div class="cache-grid" id="temp-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">操作成功</div>
+
+    <!-- Image Modal -->
+    <div id="image-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; flex-direction: column;">
+        <button onclick="document.getElementById('image-modal').style.display='none'" style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; font-size: 30px; cursor: pointer;">&times;</button>
+        <img id="modal-img" src="" style="max-width: 90%; max-height: 80%; object-fit: contain; border-radius: 8px;">
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <a id="modal-download" href="" download class="btn btn-secondary" style="text-decoration: none;">💾 下载</a>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let currentRenderedFile = null;
+        let currentStyle = 'default';
+        let renderTimeout = null;
+        let viewer = null;
+
+        // --- Theme ---
+        function toggleTheme() {
+            const body = document.body;
+            const current = body.getAttribute('data-theme');
+            body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+        }
+
+        // --- Toast ---
+        function showToast(msg, isError=false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast' + (isError ? ' error' : '');
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // --- Initialization ---
+        document.addEventListener("DOMContentLoaded", () => {
+            loadFiles();
+            loadTempFigures();
+            loadSavedFigures();
+            init3DViewer();
+            
+            // Bind style buttons
+            document.querySelectorAll('.style-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentStyle = btn.dataset.style;
+                    triggerRender();
+                };
+            });
+
+            // Bind auto-render inputs
+            document.querySelectorAll('.auto-render-input').forEach(input => {
+                input.addEventListener('change', triggerRender);
+            });
+        });
+
+        // --- 3D Viewer ---
+        function init3DViewer() {
+            let element = document.getElementById('viewer');
+            let config = { backgroundColor: 'white' };
+            viewer = $3Dmol.createViewer(element, config);
+            
+            // Listen for interaction to trigger render
+            element.addEventListener('mouseup', triggerRender);
+            element.addEventListener('wheel', triggerRender);
+            element.addEventListener('touchend', triggerRender);
+        }
+
+        function setViewAxis(axis) {
+            if (!viewer) return;
+            let view = viewer.getView();
+            // view is [cx, cy, cz, zoom, qx, qy, qz, qw]
+            let qx = 0, qy = 0, qz = 0, qw = 1;
+            if (axis === 'x') {
+                // Look down X axis: rotate 90 degrees around Y axis
+                qy = Math.sin(Math.PI / 4);
+                qw = Math.cos(Math.PI / 4);
+            } else if (axis === 'y') {
+                // Look down Y axis: rotate -90 degrees around X axis
+                qx = Math.sin(-Math.PI / 4);
+                qw = Math.cos(-Math.PI / 4);
+            } else if (axis === 'z') {
+                // Look down Z axis: no rotation
+                qx = 0; qy = 0; qz = 0; qw = 1;
+            }
+            viewer.setView([view[0], view[1], view[2], view[3], qx, qy, qz, qw]);
+            triggerRender();
+        }
+
+        function getRotationMatrix() {
+            if (!viewer) return null;
+            let view = viewer.getView();
+            // view is [cx, cy, cz, zoom, rx, ry, rz, rw]
+            let x = view[4], y = view[5], z = view[6], w = view[7];
+            
+            // 3Dmol.js quaternion represents the object's rotation directly.
+            // We don't need to invert it.
+            
+            let x2 = x + x, y2 = y + y, z2 = z + z;
+            let xx = x * x2, xy = x * y2, xz = x * z2;
+            let yy = y * y2, yz = y * z2, zz = z * z2;
+            let wx = w * x2, wy = w * y2, wz = w * z2;
+
+            let m00 = 1 - (yy + zz), m01 = xy - wz, m02 = xz + wy;
+            let m10 = xy + wz, m11 = 1 - (xx + zz), m12 = yz - wx;
+            let m20 = xz - wy, m21 = yz + wx, m22 = 1 - (xx + yy);
+
+            return [
+                m00, m01, m02,
+                m10, m11, m12,
+                m20, m21, m22
+            ];
+        }
+
+        async function saveRotatedMolecule() {
+            if (!selectedFile || !viewer) return;
+            try {
+                const res = await fetch('/api/rotate_molecule', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        file: selectedFile,
+                        matrix: getRotationMatrix()
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('视角保存成功！');
+                    loadFiles();
+                    selectFile(data.rotated_file);
+                } else {
+                    showToast('保存失败: ' + data.error, true);
+                }
+            } catch (e) {
+                showToast('请求失败', true);
+            }
+        }
+
+        // --- File Management ---
+        async function loadFiles() {
+            const res = await fetch('/api/molecules');
+            const files = await res.json();
+            const list = document.getElementById('mol-list');
+            list.innerHTML = '';
+            files.forEach(f => {
+                const li = document.createElement('li');
+                li.className = `file-item ${selectedFile === f.name ? 'selected' : ''}`;
+                li.innerHTML = `
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${f.name}">${f.name}</span>
+                    <button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${f.name}')">×</button>
+                `;
+                li.onclick = () => selectFile(f.name);
+                list.appendChild(li);
+            });
+        }
+
+        async function selectFile(name) {
+            selectedFile = name;
+            loadFiles(); // Update UI selection
+            
+            // Load into 3D Viewer
+            try {
+                const res = await fetch('/api/get_xyz', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({file: name})
+                });
+                const data = await res.json();
+                if (res.ok && data.symbols) {
+                    window.currentSymbols = data.symbols;
+                    let xyzStr = `${data.n}\n\n`;
+                    for(let i=0; i<data.n; i++){
+                        xyzStr += `${data.symbols[i]} ${data.coords[i][0]} ${data.coords[i][1]} ${data.coords[i][2]}\n`;
+                    }
+                    viewer.clear();
+                    viewer.addModel(xyzStr, "xyz");
+                    viewer.setStyle({}, {stick: {radius: 0.15}, sphere: {scale: 0.3}});
+                    viewer.zoomTo();
+                    viewer.render();
+                    
+                    document.getElementById('viewer-toolbar').style.display = 'flex';
+                    
+                    // Populate element colors
+                    const uniqueElements = [...new Set(data.symbols)];
+                    const container = document.getElementById('element_colors_container');
+                    container.innerHTML = '';
+                    uniqueElements.forEach(elem => {
+                        const row = document.createElement('div');
+                        row.style.display = 'flex';
+                        row.style.gap = '5px';
+                        row.style.alignItems = 'center';
+                        row.innerHTML = `
+                            <span style="width: 30px; font-weight: bold;">${elem}</span>
+                            <input type="color" id="color_${elem}" value="#ffffff" class="auto-render-input element-color-input" data-element="${elem}" data-active="false" oninput="this.dataset.active='true'; this.style.opacity=1;" style="flex: 1; padding: 0; height: 28px; opacity: 0.5; transition: opacity 0.2s;">
+                            <button class="btn btn-secondary" style="padding: 0 8px; font-size: 0.8em;" onclick="const el=document.getElementById('color_${elem}'); el.dataset.active='false'; el.style.opacity=0.5; triggerRender();" title="恢复默认">重置</button>
+                        `;
+                        container.appendChild(row);
+                    });
+
+                    // Re-bind change events for new inputs
+                    document.querySelectorAll('.element-color-input').forEach(input => {
+                        input.addEventListener('input', triggerRender);
+                    });
+
+                    // Trigger render for the new file
+                    triggerRender();
+                }
+            } catch (e) {
+                console.error("Failed to load 3D preview", e);
+            }
+        }
+
+        async function deleteFile(name) {
+            if(!confirm(`确定删除 ${name} 吗？`)) return;
+            await fetch('/api/delete_molecule', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            if(selectedFile === name) {
+                selectedFile = null;
+                document.getElementById('preview-img').style.display = 'none';
+                document.getElementById('preview-placeholder').style.display = 'block';
+                document.getElementById('download-btn').disabled = true;
+                document.getElementById('viewer-toolbar').style.display = 'none';
+                document.getElementById('element_colors_container').innerHTML = '<span style="color: #888; font-size: 0.9em;">请先加载分子</span>';
+                if(viewer) viewer.clear();
+            }
+            loadFiles();
+        }
+
+        // --- Upload ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        async function handleFiles(files) {
+            if(!files.length) return;
+            for(let f of files) {
+                const formData = new FormData();
+                formData.append('file', f);
+                await fetch('/api/upload', { method: 'POST', body: formData });
+            }
+            showToast('上传成功！');
+            loadFiles();
+            if(files.length > 0) selectFile(files[0].name);
+        }
+
+        // --- Render Logic ---
+        function triggerRender() {
+            if (!selectedFile) return;
+            clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(doRender, 400); // 400ms debounce
+        }
+
+        async function doRender() {
+            if (!selectedFile) return;
+
+            // Handle color inputs: if they were reset (empty string), don't send the color picker's default value
+            let bondColorInput = document.getElementById('bond_color');
+            let bondColor = bondColorInput.dataset.active === 'true' ? bondColorInput.value : '';
+
+            // Collect element-specific colors
+            let highlights = [];
+            document.querySelectorAll('.element-color-input').forEach(input => {
+                if (input.dataset.active === 'true') {
+                    let elem = input.dataset.element;
+                    let color = input.value;
+                    let indices = [];
+                    if (window.currentSymbols) {
+                        window.currentSymbols.forEach((s, i) => {
+                            if (s === elem) indices.push(i);
+                        });
+                    }
+                    if (indices.length > 0) {
+                        highlights.push({
+                            atoms: indices.join(','),
+                            color: color
+                        });
+                    }
+                }
+            });
+
+            const payload = {
+                file: selectedFile,
+                style: currentStyle,
+                format: document.getElementById('format').value,
+                bg_color: document.getElementById('bg_color').value,
+                transparent: document.getElementById('transparent').checked,
+                bond_color: bondColor,
+                bond_width: document.getElementById('bond_width').value,
+                highlights: highlights,
+                atom_scale: document.getElementById('atom_scale').value,
+                atom_stroke_width: document.getElementById('atom_stroke_width').value,
+                canvas_size: document.getElementById('canvas_size').value,
+                dpi: document.getElementById('dpi').value,
+                no_bonds: document.getElementById('no_bonds').checked,
+                no_hy: document.getElementById('no_hy').checked,
+                hydrogens: document.getElementById('hydrogens').checked,
+                idx: document.getElementById('idx').checked ? "true" : null,
+                cell: document.getElementById('cell').checked,
+                axes: document.getElementById('axes').checked,
+                vdw: document.getElementById('vdw').checked ? "all" : null,
+                dof: document.getElementById('dof').checked,
+                fog: document.getElementById('fog').checked,
+                rotation_matrix: getRotationMatrix()
+            };
+
+            const loading = document.getElementById('loading');
+            const previewImg = document.getElementById('preview-img');
+            const previewPlaceholder = document.getElementById('preview-placeholder');
+            const downloadBtn = document.getElementById('download-btn');
+
+            loading.style.display = 'flex';
+            previewImg.style.display = 'none';
+            previewPlaceholder.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/render', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    currentRenderedFile = data.output;
+                    const newSrc = `/temp/${data.output}?t=${new Date().getTime()}`;
+                    
+                    // Wait for image to load before hiding spinner
+                    const tempImg = new Image();
+                    tempImg.onload = () => {
+                        previewImg.src = newSrc;
+                        previewImg.style.display = 'block';
+                        loading.style.display = 'none';
+                    };
+                    tempImg.onerror = () => {
+                        previewPlaceholder.style.display = 'block';
+                        previewPlaceholder.textContent = '图片加载失败';
+                        loading.style.display = 'none';
+                    };
+                    tempImg.src = newSrc;
+                    
+                    document.getElementById('save-btn').disabled = false;
+                    downloadBtn.disabled = false;
+                    loadTempFigures();
+                } else {
+                    previewPlaceholder.style.display = 'block';
+                    previewPlaceholder.textContent = '渲染失败: ' + data.error;
+                    showToast('渲染失败', true);
+                    loading.style.display = 'none';
+                }
+            } catch (e) {
+                previewPlaceholder.style.display = 'block';
+                previewPlaceholder.textContent = '请求失败';
+                showToast('请求失败', true);
+                loading.style.display = 'none';
+            }
+        }
+
+        function downloadImage() {
+            if (!currentRenderedFile) return;
+            const a = document.createElement('a');
+            a.href = `/temp/${currentRenderedFile}`;
+            a.download = currentRenderedFile;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // --- Cache & Saved Renders ---
+        async function loadTempFigures() {
+            try {
+                const res = await fetch('/api/temp_figures');
+                const figs = await res.json();
+                const list = document.getElementById('temp-list');
+                list.innerHTML = '';
+                figs.forEach(f => {
+                    const item = document.createElement('div');
+                    item.className = 'cache-item';
+                    item.innerHTML = `
+                        <img src="/temp/${f.name}" alt="${f.name}" onclick="openModal('/temp/${f.name}')">
+                        <button class="delete-btn" onclick="deleteTemp('${f.name}')" title="删除">×</button>
+                    `;
+                    list.appendChild(item);
+                });
+            } catch (e) {
+                console.error("Failed to load temp figures", e);
+            }
+        }
+
+        async function loadSavedFigures() {
+            try {
+                const res = await fetch('/api/figures');
+                const figs = await res.json();
+                const list = document.getElementById('saved-list');
+                list.innerHTML = '';
+                figs.forEach(f => {
+                    const item = document.createElement('div');
+                    item.className = 'cache-item';
+                    item.innerHTML = `
+                        <img src="/figures/${f.name}" alt="${f.name}" onclick="openModal('/figures/${f.name}')">
+                        <button class="delete-btn" onclick="deleteSaved('${f.name}')" title="删除">×</button>
+                    `;
+                    list.appendChild(item);
+                });
+            } catch (e) {
+                console.error("Failed to load saved figures", e);
+            }
+        }
+
+        async function saveImage() {
+            if (!currentRenderedFile) return;
+            try {
+                const res = await fetch('/api/save_figure', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: currentRenderedFile})
+                });
+                if (res.ok) {
+                    showToast('保存成功！');
+                    loadSavedFigures();
+                } else {
+                    showToast('保存失败', true);
+                }
+            } catch (e) {
+                showToast('请求失败', true);
+            }
+        }
+
+        async function deleteTemp(name) {
+            if (!confirm(`确定删除预览缓存 ${name} 吗？`)) return;
+            await fetch('/api/delete_temp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            loadTempFigures();
+        }
+
+        async function deleteSaved(name) {
+            if (!confirm(`确定删除已保存渲染 ${name} 吗？`)) return;
+            await fetch('/api/delete_figure', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            loadSavedFigures();
+        }
+
+        async function clearTemp() {
+            if (!confirm('确定清空所有预览缓存吗？')) return;
+            await fetch('/api/clear_temp', { method: 'POST' });
+            loadTempFigures();
+        }
+
+        function openModal(src) {
+            document.getElementById('modal-img').src = src;
+            document.getElementById('modal-download').href = src;
+            document.getElementById('image-modal').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
